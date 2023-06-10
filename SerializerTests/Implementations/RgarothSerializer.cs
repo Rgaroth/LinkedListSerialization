@@ -9,17 +9,16 @@ public class RgarothSerializer
 {
     public Task<ListNode> DeepCopy(ListNode head)
     {
-        var nodes = GetNodesInfo(head, false)
-            .OrderBy(x => x.Value.Order);
+        var nodesInfo = GetNodesInfo(head, false);
 
         var newNodes = new Dictionary<long, (ListNode ListNode, NodeInfo Info)>();
         ListNode prevNewNode = null;
 
-        foreach (var node in nodes)
+        foreach (var nodeInfo in nodesInfo)
         {
             var newNode = new ListNode
             {
-                Data = node.Key.Data,
+                Data = nodeInfo.Data,
                 Previous = prevNewNode,
             };
 
@@ -28,7 +27,7 @@ public class RgarothSerializer
                 prevNewNode.Next = newNode;
             }
 
-            newNodes.Add(node.Value.Id, (newNode, node.Value));
+            newNodes.Add(nodeInfo.Id, (newNode, nodeInfo));
 
             prevNewNode = newNode;
         }
@@ -134,15 +133,14 @@ public class RgarothSerializer
 
         var serial = string.Join(',',
             tempNodes
-                .OrderBy(x => x.Value.Order)
-                .Select(item => $"{item.Value.Id}.{item.Value.RandId}.{item.Value.Data}"));
+                .Select(item => $"{item.Id}.{item.RandId}.{item.Data}"));
 
         var bytes = Encoding.UTF8.GetBytes(serial);
 
         await stream.WriteAsync(bytes);
     }
 
-    private Dictionary<ListNode, NodeInfo> GetNodesInfo(ListNode head, bool isShield)
+    private IEnumerable<NodeInfo> GetNodesInfo(ListNode head, bool isShield)
     {
         long id = 0;
         long order = 0;
@@ -207,7 +205,9 @@ public class RgarothSerializer
             currentNode = currentNode.Next;
         }
 
-        return tempNodes;
+        return tempNodes
+            .Select(x => x.Value)
+            .OrderBy(x => x.Order);
     }
 
     private string ReplaceSpecialSymbols(string source, bool shield)
