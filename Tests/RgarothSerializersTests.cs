@@ -2,7 +2,7 @@ using SerializerTests;
 using SerializerTests.Implementations;
 using SerializerTests.Nodes;
 
-namespace TestProject1;
+namespace Tests;
 
 public class Tests
 {
@@ -31,7 +31,7 @@ public class Tests
     [Test]
     public async Task SerializeAndDeserialize_DataEquals_True()
     {
-        var node = ListNodeGenerator.Generate(100);
+        var node = ListNodeGenerator.Generate(1000000);
         var data = ExtractData(node);
         
         var stream = new MemoryStream();

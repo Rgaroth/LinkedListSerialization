@@ -3,4 +3,4 @@ using ConsoleApp1;
 using SerializerTests;
 using SerializerTests.Implementations;
 
-//BenchmarkRunner.Run<BenchSerializer>();
+BenchmarkRunner.Run<BenchSerializer>();

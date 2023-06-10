@@ -1,61 +1,69 @@
 ﻿using System.Text;
 using System.Text.RegularExpressions;
-using SerializerTests.Interfaces;
 using SerializerTests.Nodes;
+using NodeInfo = SerializerTests.Nodes.NodeInfo;
 
-namespace SerializerTests.Implementations
+namespace SerializerTests.Implementations;
+
+public class RgarothSerializer
 {
-    public class RgarothSerializer : IListSerializer
+    public Task<ListNode> DeepCopy(ListNode head)
     {
-        public Task<ListNode> DeepCopy(ListNode head)
+        var nodes = GetNodesInfo(head, false)
+            .OrderBy(x => x.Value.Order);
+
+        var newNodes = new Dictionary<long, (ListNode ListNode, NodeInfo Info)>();
+        ListNode prevNewNode = null;
+
+        foreach (var node in nodes)
         {
-            var nodes = GetNodesInfo(head, false)
-                .OrderBy(x => x.Value.Order);
-            
-            var newNodes = new Dictionary<long, (ListNode ListNode, NodeInfo Info)>();
-            ListNode prevNewNode = null;
-
-            foreach (var node in nodes)
+            var newNode = new ListNode
             {
-                var newNode = new ListNode
-                {
-                    Data = node.Key.Data,
-                    Previous = prevNewNode,
-                };
+                Data = node.Key.Data,
+                Previous = prevNewNode,
+            };
 
-                if (prevNewNode != null)
-                {
-                    prevNewNode.Next = newNode;
-                }
-                
-                newNodes.Add(node.Value.Id, (newNode, node.Value));
-
-                prevNewNode = newNode;
+            if (prevNewNode != null)
+            {
+                prevNewNode.Next = newNode;
             }
 
-            RestoreRandomNodes(newNodes);
+            newNodes.Add(node.Value.Id, (newNode, node.Value));
 
-            return Task.FromResult(newNodes.First().Value.ListNode);
+            prevNewNode = newNode;
         }
 
-        public async Task<ListNode> Deserialize(Stream stream)
+        RestoreRandomNodes(newNodes);
+
+        return Task.FromResult(newNodes.First().Value.ListNode);
+    }
+
+    public async Task<ListNode> Deserialize(Stream stream)
+    {
+        stream.Position = 0;
+        var nodes = new Dictionary<long, (ListNode ListNode, NodeInfo Info)>();
+        var reader = new StreamReader(stream, Encoding.UTF8);
+
+        var tail = string.Empty;
+        
+        while (!reader.EndOfStream)
         {
-            stream.Position = 0;
-            using var reader = new StreamReader(stream, Encoding.UTF8);
-
-            var text = await reader.ReadToEndAsync();
-
+            var text = await reader.ReadLineAsync();
+            text = tail + text;
+            
             if (string.IsNullOrWhiteSpace(text))
             {
                 throw new ArgumentException();
             }
             
             var nodesSerial = Regex.Split(text, @"(?<!\\),").ToList();
+            var curTail = nodesSerial.Last();
+            nodesSerial.RemoveAt(nodesSerial.Count - 1);
+            
+            tail = string.IsNullOrEmpty(curTail) ? string.Empty : curTail;
 
             ListNode prev = null;
 
-            var nodes = new Dictionary<long, (ListNode ListNode, NodeInfo Info)>();
-            
             var splitedNodes = nodesSerial
                 .Select(str => Regex.Split(str, @"(?<!\\)\."))
                 .ToList();
@@ -71,17 +79,17 @@ namespace SerializerTests.Implementations
                 {
                     throw new ArgumentException();
                 }
-                
+
                 var nodeInfo = new NodeInfo
                 {
-                    Id = int.TryParse(parts[0], out var id) 
-                        ? id 
+                    Id = int.TryParse(parts[0], out var id)
+                        ? id
                         : throw new ArgumentException(),
-                    
-                    RandId = int.TryParse(parts[1], out var randId) 
-                        ? randId 
-                        : string.IsNullOrEmpty(parts[1]) 
-                            ? null 
+
+                    RandId = int.TryParse(parts[1], out var randId)
+                        ? randId
+                        : string.IsNullOrEmpty(parts[1])
+                            ? null
                             : throw new ArgumentException(),
                 };
 
@@ -100,111 +108,116 @@ namespace SerializerTests.Implementations
 
                 nodes.Add(nodeInfo.Id, (listNode, nodeInfo));
             }
-
-            RestoreRandomNodes(nodes);
-
-            return nodes.First().Value.ListNode;
         }
 
-        public async Task Serialize(ListNode head, Stream stream)
+        if (!nodes.Any())
         {
-            var tempNodes = GetNodesInfo(head, true);
-
-            var serial = string.Join(',',
-                tempNodes
-                    .OrderBy(x => x.Value.Order)
-                    .Select(item => $"{item.Value.Id}.{item.Value.RandId}.{item.Value.Data}"));
-
-            var bytes = Encoding.UTF8.GetBytes(serial);
-
-            await stream.WriteAsync(bytes);
+            throw new ArgumentException();
         }
 
-        private Dictionary<ListNode, NodeInfo> GetNodesInfo(ListNode head, bool isShield)
+        RestoreRandomNodes(nodes);
+
+        return nodes.First().Value.ListNode;
+    }
+
+    private static void RestoreRandomNodes(IReadOnlyDictionary<long, (ListNode ListNode, NodeInfo Info)> nodes)
+    {
+        foreach (var node in nodes.Where(node => node.Value.Info.RandId.HasValue))
         {
-            long id = 0;
-            long order = 0;
-            var tempNodes = new Dictionary<ListNode, NodeInfo>();
+            node.Value.ListNode.Random = nodes[node.Value.Info.RandId.Value].ListNode;
+        }
+    }
 
-            var currentNode = head;
+    public async Task Serialize(ListNode head, Stream stream)
+    {
+        var tempNodes = GetNodesInfo(head, true);
 
-            while (currentNode != null)
+        var serial = string.Join(',',
+            tempNodes
+                .OrderBy(x => x.Value.Order)
+                .Select(item => $"{item.Value.Id}.{item.Value.RandId}.{item.Value.Data}"));
+
+        var bytes = Encoding.UTF8.GetBytes(serial);
+
+        await stream.WriteAsync(bytes);
+    }
+
+    private Dictionary<ListNode, NodeInfo> GetNodesInfo(ListNode head, bool isShield)
+    {
+        long id = 0;
+        long order = 0;
+        var tempNodes = new Dictionary<ListNode, NodeInfo>();
+
+        var currentNode = head;
+
+        while (currentNode != null)
+        {
+            var existNode = tempNodes.TryGetValue(currentNode, out var exist) ? exist : null;
+
+            // если уже содержит текущую ноду, значит мы прошли по этой ноде и всем ее Random
+            // назначаем ей текущий номер по порядку и пропускаем
+            if (existNode != null)
             {
-                var existNode = tempNodes.TryGetValue(currentNode, out var exist) ? exist : null;
+                existNode.Order = order++;
+                currentNode = currentNode.Next;
 
-                // если уже содержит текущую ноду, значит мы прошли по этой ноде и всем ее Random
-                // назначаем ей текущий номер по порядку и пропускаем
-                if (existNode != null)
+                continue;
+            }
+
+            var node = new NodeInfo
+            {
+                Id = id++,
+                Order = order++,
+                Data = isShield
+                    ? ReplaceSpecialSymbols(currentNode.Data, true)
+                    : currentNode.Data
+            };
+
+            tempNodes.Add(currentNode, node);
+
+            var currentRand = currentNode.Random;
+            var prevRand = node;
+
+            // идем по всем Random до тех пор, пока следующая нода не вернет null
+            while (currentRand != null)
+            {
+                var existRandNode = tempNodes.TryGetValue(currentRand, out var existRand) ? existRand : null;
+
+                if (existRandNode != null)
                 {
-                    existNode.Order = order++;
-                    currentNode = currentNode.Next;
-
-                    continue;
+                    prevRand.RandId = existRandNode.Id;
+                    break;
                 }
 
-                var node = new NodeInfo
+                var randNode = new NodeInfo
                 {
                     Id = id++,
-                    Order = order++,
-                    Data = isShield 
-                        ? ReplaceSpecialSymbols(currentNode.Data, true) 
-                        : currentNode.Data
+                    Data = isShield
+                        ? ReplaceSpecialSymbols(currentRand.Data, true)
+                        : currentRand.Data
                 };
 
-                tempNodes.Add(currentNode, node);
+                prevRand.RandId = randNode.Id;
 
-                var currentRand = currentNode.Random;
-                var prevRand = node;
-
-                // идем по всем Random до тех пор, пока следующая нода не вернет null
-                while (currentRand != null)
-                {
-                    var existRandNode = tempNodes.TryGetValue(currentRand, out var existRand) ? existRand : null;
-
-                    if (existRandNode != null)
-                    {
-                        prevRand.RandId = existRandNode.Id;
-                        break;
-                    }
-
-                    var randNode = new NodeInfo
-                    {
-                        Id = id++,
-                        Data = isShield 
-                            ? ReplaceSpecialSymbols(currentRand.Data, true)
-                            : currentRand.Data
-                    };
-
-                    prevRand.RandId = randNode.Id;
-
-                    tempNodes.Add(currentRand, randNode);
-                    prevRand = randNode;
-                    currentRand = currentRand.Random;
-                }
-
-                currentNode = currentNode.Next;
+                tempNodes.Add(currentRand, randNode);
+                prevRand = randNode;
+                currentRand = currentRand.Random;
             }
 
-            return tempNodes;
+            currentNode = currentNode.Next;
         }
 
-        private string ReplaceSpecialSymbols(string source, bool shield)
-        {
-            return shield
-                ? source
-                    .Replace(".", "\\.")
-                    .Replace(",", "\\,")
-                : source
-                    .Replace("\\.", ".")
-                    .Replace("\\,", ",");
-        }
+        return tempNodes;
+    }
 
-        private static void RestoreRandomNodes(IReadOnlyDictionary<long, (ListNode ListNode, NodeInfo Info)> newNodes)
-        {
-            foreach (var node in newNodes.Where(node => node.Value.Info.RandId.HasValue))
-            {
-                node.Value.ListNode.Random = newNodes[node.Value.Info.RandId.Value].ListNode;
-            }
-        }
+    private string ReplaceSpecialSymbols(string source, bool shield)
+    {
+        return shield
+            ? source
+                .Replace(".", "\\.")
+                .Replace(",", "\\,")
+            : source
+                .Replace("\\.", ".")
+                .Replace("\\,", ",");
     }
 }

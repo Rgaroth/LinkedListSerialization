@@ -9,8 +9,12 @@ public class BenchSerializer
 {
 
     private ListNode[] _nodes;
-    
+    private MemoryStream[] _streams;
+
     [Benchmark]
+    // [Arguments(0)]
+    // [Arguments(1)]
+    // [Arguments(2)]
     [Arguments(3)]
     public async Task Serialize(int i)
     {
@@ -19,19 +23,22 @@ public class BenchSerializer
         await ser.Serialize(_nodes[i], stream);
     }
 
-    // [Benchmark]
+    [Benchmark]
     // [Arguments(0)]
     // [Arguments(1)]
     // [Arguments(2)]
+    [Arguments(3)]
     public async Task Deserialize(int i)
     {
-        
+        var ser = new RgarothSerializer();
+        await ser.Deserialize(_streams[i]);
     }
     
-    // [Benchmark]
+    [Benchmark]
     // [Arguments(0)]
     // [Arguments(1)]
     // [Arguments(2)]
+    [Arguments(3)]
     public async Task DeepCopy(int i)
     {
         var ser = new RgarothSerializer();
@@ -41,6 +48,8 @@ public class BenchSerializer
     [GlobalSetup]
     public async Task InitSource()
     {
+        var ser = new RgarothSerializer();
+        
         _nodes = new[]
         {
             ListNodeGenerator.Generate(1000), 
@@ -48,5 +57,17 @@ public class BenchSerializer
             ListNodeGenerator.Generate(100000),
             ListNodeGenerator.Generate(1000000),
         };
+
+        var streams = new List<MemoryStream>();
+
+        foreach (var node in _nodes)
+        {
+            var stream = new MemoryStream();
+
+            await ser.Serialize(node, stream);
+            streams.Add(stream);
+        }
+
+        _streams = streams.ToArray();
     }
 }
