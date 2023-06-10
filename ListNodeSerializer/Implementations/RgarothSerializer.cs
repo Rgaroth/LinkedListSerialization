@@ -1,7 +1,7 @@
 ﻿using System.Text;
 using System.Text.RegularExpressions;
 using SerializerTests.Nodes;
-using NodeInfo = SerializerTests.Nodes.NodeInfo;
+using NodeInfo = ListNodeSerializer.Nodes.NodeInfo;
 
 namespace SerializerTests.Implementations;
 

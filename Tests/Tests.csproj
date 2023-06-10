@@ -19,7 +19,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\SerializerTests\SerializerTests.csproj" />
+        <ProjectReference Include="..\ListNodeSerializer\ListNodeSerializer.csproj" />
     </ItemGroup>
 
 </Project>

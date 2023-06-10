@@ -1,5 +1,5 @@
 ﻿using BenchmarkDotNet.Running;
-using ConsoleApp1;
+using Benchmark;
 using SerializerTests;
 using SerializerTests.Implementations;
 

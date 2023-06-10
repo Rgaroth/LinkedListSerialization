@@ -1,9 +1,10 @@
 ﻿using BenchmarkDotNet.Attributes;
+using ListNodeSerializer;
 using SerializerTests;
 using SerializerTests.Implementations;
 using SerializerTests.Nodes;
 
-namespace ConsoleApp1;
+namespace Benchmark;
 
 public class BenchSerializer
 {

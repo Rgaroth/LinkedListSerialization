@@ -1,6 +1,6 @@
 ﻿using SerializerTests.Nodes;
 
-namespace SerializerTests;
+namespace ListNodeSerializer;
 
 public static class ListNodeGenerator
 {

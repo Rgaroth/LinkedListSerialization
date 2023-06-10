@@ -1,4 +1,4 @@
-﻿namespace SerializerTests.Nodes;
+﻿namespace ListNodeSerializer.Nodes;
 
 internal class NodeInfo
 {
