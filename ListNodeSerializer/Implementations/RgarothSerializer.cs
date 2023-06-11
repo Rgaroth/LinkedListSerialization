@@ -8,19 +8,19 @@ namespace SerializerTests.Implementations;
 
 public class RgarothSerializer : IListSerializer
 {
-    public Task Serialize(ListNode head, Stream stream)
+    public async Task Serialize(ListNode head, Stream stream)
     {
         var tempNodes = GetNodesInfo(head, true);
 
         foreach (var node in tempNodes)
         {
-            stream.Write(BitConverter.GetBytes(node.Id));
-            stream.Write(BitConverter.GetBytes(node.RandId ?? -1));
-            stream.Write(BitConverter.GetBytes(node.Data.Length));
-            stream.Write(Encoding.UTF8.GetBytes(node.Data));
+            await stream.WriteAsync(BitConverter.GetBytes(node.Id));
+            await stream.WriteAsync(BitConverter.GetBytes(node.RandId ?? -1));
+            await stream.WriteAsync(BitConverter.GetBytes(node.Data.Length));
+            await stream.WriteAsync(Encoding.UTF8.GetBytes(node.Data));
         }
 
-        return Task.CompletedTask;
+        //return Task.CompletedTask;
     }
 
     public async Task<ListNode> Deserialize(Stream stream)
