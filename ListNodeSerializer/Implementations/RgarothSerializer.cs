@@ -50,7 +50,10 @@ public class RgarothSerializer : IListSerializer
 
             if (readBytesId != 4 ||
                 readBytesRandId != 4 ||
-                readBytesDataSize != 4)
+                readBytesDataSize != 4 ||
+                nodeId < 0 ||
+                nodeRandomId < -1 ||
+                dataLength < 0 )
             {
                 throw new ArgumentException();
             }
@@ -58,16 +61,9 @@ public class RgarothSerializer : IListSerializer
             var dataBytes = new byte[dataLength];
             var dataRealRead = await stream.ReadAsync(dataBytes, 0, dataBytes.Length);
 
-            if (dataRealRead != dataLength)
-            {
-                throw new ArgumentException();
-            }
-            
             var nodeData = Encoding.UTF8.GetString(dataBytes);
 
-            if (nodeId < 0 ||
-                nodeRandomId < -1 ||
-                dataLength < 0)
+            if (dataRealRead != dataLength)
             {
                 throw new ArgumentException();
             }
