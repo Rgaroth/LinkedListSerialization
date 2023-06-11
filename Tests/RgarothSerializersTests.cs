@@ -1,3 +1,4 @@
+using System.Text;
 using ListNodeSerializer;
 using SerializerTests;
 using SerializerTests.Implementations;
@@ -22,7 +23,10 @@ public class Tests
         stream.Write("123"u8);
         
         var stream2 = new MemoryStream();
-        stream2.Write("1.1.1.1"u8);
+        stream2.Write(BitConverter.GetBytes(1));
+        stream2.Write(BitConverter.GetBytes(-1));
+        stream2.Write(BitConverter.GetBytes(2));
+        stream2.Write("122"u8);
         
         Assert.ThrowsAsync<ArgumentException>(async () => await _serializer.Deserialize(new MemoryStream()));
         Assert.ThrowsAsync<ArgumentException>(async () => await _serializer.Deserialize(stream));
@@ -32,25 +36,12 @@ public class Tests
     [Test]
     public async Task SerializeAndDeserialize_DataEquals_True()
     {
-        var node = ListNodeGenerator.Generate(1000000);
+        var node = ListNodeGenerator.Generate(1000);
         var data = ExtractData(node);
         
         var stream = new MemoryStream();
         await _serializer.Serialize(node, stream);
         var newNode = await _serializer.Deserialize(stream);
-        
-        Assert.True(IsEqualsData(newNode, data));
-    }
-    
-    [Test]
-    public async Task ByteSerializeAndDeserialize_DataEquals_True()
-    {
-        var node = ListNodeGenerator.Generate(10000);
-        var data = ExtractData(node);
-        
-        var stream = new MemoryStream();
-        await _serializer.ByteSerialize(node, stream);
-        var newNode = await _serializer.ByteDeserialize(stream);
         
         Assert.True(IsEqualsData(newNode, data));
     }

@@ -11,30 +11,10 @@ public class BenchSerializer
 
     private ListNode[] _nodes;
     private MemoryStream[] _streams;
+    private MemoryStream[] _byteStreams;
     
-    //[Benchmark]
-    // [Arguments(0)]
-    // [Arguments(1)]
-    // [Arguments(2)]
-    [Arguments(3)]
-    public async Task ByteSerialize(int i)
-    {
-        var ser = new RgarothSerializer();
-        using var stream = new MemoryStream();
-        await ser.ByteSerialize(_nodes[i], stream);
-    }
-    [Benchmark]
-    // [Arguments(0)]
-    // [Arguments(1)]
-    // [Arguments(2)]
-    [Arguments(3)]
-    public async Task ByteDeserialize(int i)
-    {
-        var ser = new RgarothSerializer();
-        await ser.ByteDeserialize(_streams[i]);
-    }
 
-    //[Benchmark]
+    [Benchmark()]
     // [Arguments(0)]
     // [Arguments(1)]
     // [Arguments(2)]
@@ -46,7 +26,7 @@ public class BenchSerializer
         await ser.Serialize(_nodes[i], stream);
     }
 
-    //[Benchmark]
+    [Benchmark()]
     // [Arguments(0)]
     // [Arguments(1)]
     // [Arguments(2)]
@@ -57,7 +37,7 @@ public class BenchSerializer
         await ser.Deserialize(_streams[i]);
     }
     
-    //[Benchmark]
+    [Benchmark]
     // [Arguments(0)]
     // [Arguments(1)]
     // [Arguments(2)]
