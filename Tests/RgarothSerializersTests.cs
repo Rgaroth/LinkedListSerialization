@@ -41,6 +41,19 @@ public class Tests
         
         Assert.True(IsEqualsData(newNode, data));
     }
+    
+    [Test]
+    public async Task ByteSerializeAndDeserialize_DataEquals_True()
+    {
+        var node = ListNodeGenerator.Generate(10000);
+        var data = ExtractData(node);
+        
+        var stream = new MemoryStream();
+        await _serializer.ByteSerialize(node, stream);
+        var newNode = await _serializer.ByteDeserialize(stream);
+        
+        Assert.True(IsEqualsData(newNode, data));
+    }
 
     [Test]
     public async Task DeepCopy_DataEquals_True()
@@ -53,7 +66,7 @@ public class Tests
         Assert.True(IsEqualsData(newNode, data));
     }
 
-    private static bool IsEqualsData(ListNode newNode, IReadOnlyList<(string Data, string RandomData)> data)
+    private static bool IsEqualsData(ListNode newNode, IReadOnlyList<(string Data, string? RandomData)> data)
     {
         var i = 0;
         

@@ -1,12 +1,75 @@
 ﻿using System.Text;
 using System.Text.RegularExpressions;
+using ListNodeSerializer.Nodes;
 using SerializerTests.Nodes;
-using NodeInfo = ListNodeSerializer.Nodes.NodeInfo;
 
 namespace SerializerTests.Implementations;
 
 public class RgarothSerializer
 {
+    public async Task ByteSerialize(ListNode head, Stream stream)
+    {
+        var tempNodes = GetNodesInfo(head, true);
+
+        foreach (var node in tempNodes)
+        {
+            stream.Write(BitConverter.GetBytes(node.Id));
+            stream.Write(BitConverter.GetBytes(node.RandId ?? -1));
+            stream.Write(BitConverter.GetBytes(node.Data.Length));
+            stream.Write(Encoding.UTF8.GetBytes(node.Data));
+        }
+    }
+
+    public async Task<ListNode> ByteDeserialize(Stream stream)
+    {
+        var nodes = new Dictionary<long, (ListNode ListNode, NodeInfo Info)>();
+
+        ListNode prev = null;
+        stream.Position = 0;
+        
+        while (stream.Position < stream.Length)
+        {
+            var bytes = new byte[4];
+
+            await stream.ReadAsync(bytes, 0, 4);
+            var nodeId = BitConverter.ToInt32(bytes);
+            
+            await stream.ReadAsync(bytes, 0, 4);
+            var nodeRandomId = BitConverter.ToInt32(bytes);
+            
+            await stream.ReadAsync(bytes, 0, 4);
+            var dataLenght = BitConverter.ToInt32(bytes);
+
+            var dataBytes = new byte[dataLenght];
+            await stream.ReadAsync(dataBytes, 0, dataBytes.Length);
+            var nodeData = Encoding.UTF8.GetString(dataBytes);
+            
+            var nodeInfo = new NodeInfo
+            {
+                Id = nodeId,
+                RandId = nodeRandomId == -1 ? null : nodeRandomId
+            };
+
+            var listNode = new ListNode
+            {
+                Previous = prev,
+                Data = ReplaceSpecialSymbols(nodeData, false)
+            };
+
+            if (prev != null) prev.Next = listNode;
+
+            prev = listNode;
+
+            nodes.Add(nodeInfo.Id, (listNode, nodeInfo));
+        }
+
+        if (!nodes.Any()) throw new ArgumentException();
+
+        RestoreRandomNodes(nodes);
+
+        return nodes.First().Value.ListNode;
+    }
+
     public Task<ListNode> DeepCopy(ListNode head)
     {
         var nodesInfo = GetNodesInfo(head, false);
@@ -19,13 +82,10 @@ public class RgarothSerializer
             var newNode = new ListNode
             {
                 Data = nodeInfo.Data,
-                Previous = prevNewNode,
+                Previous = prevNewNode
             };
 
-            if (prevNewNode != null)
-            {
-                prevNewNode.Next = newNode;
-            }
+            if (prevNewNode != null) prevNewNode.Next = newNode;
 
             newNodes.Add(nodeInfo.Id, (newNode, nodeInfo));
 
@@ -44,21 +104,18 @@ public class RgarothSerializer
         var reader = new StreamReader(stream, Encoding.UTF8);
 
         var tail = string.Empty;
-        
+
         while (!reader.EndOfStream)
         {
             var text = await reader.ReadLineAsync();
             text = tail + text;
-            
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                throw new ArgumentException();
-            }
-            
+
+            if (string.IsNullOrWhiteSpace(text)) throw new ArgumentException();
+
             var nodesSerial = Regex.Split(text, @"(?<!\\),").ToList();
             var curTail = nodesSerial.Last();
             nodesSerial.RemoveAt(nodesSerial.Count - 1);
-            
+
             tail = string.IsNullOrEmpty(curTail) ? string.Empty : curTail;
 
             ListNode prev = null;
@@ -67,17 +124,11 @@ public class RgarothSerializer
                 .Select(str => Regex.Split(str, @"(?<!\\)\."))
                 .ToList();
 
-            if (!splitedNodes.Any())
-            {
-                throw new ArgumentException();
-            }
+            if (!splitedNodes.Any()) throw new ArgumentException();
 
             foreach (var parts in splitedNodes)
             {
-                if (parts.Length != 3)
-                {
-                    throw new ArgumentException();
-                }
+                if (parts.Length != 3) throw new ArgumentException();
 
                 var nodeInfo = new NodeInfo
                 {
@@ -89,7 +140,7 @@ public class RgarothSerializer
                         ? randId
                         : string.IsNullOrEmpty(parts[1])
                             ? null
-                            : throw new ArgumentException(),
+                            : throw new ArgumentException()
                 };
 
                 var listNode = new ListNode
@@ -98,10 +149,7 @@ public class RgarothSerializer
                     Data = ReplaceSpecialSymbols(parts[2], false)
                 };
 
-                if (prev != null)
-                {
-                    prev.Next = listNode;
-                }
+                if (prev != null) prev.Next = listNode;
 
                 prev = listNode;
 
@@ -109,10 +157,7 @@ public class RgarothSerializer
             }
         }
 
-        if (!nodes.Any())
-        {
-            throw new ArgumentException();
-        }
+        if (!nodes.Any()) throw new ArgumentException();
 
         RestoreRandomNodes(nodes);
 
@@ -122,28 +167,33 @@ public class RgarothSerializer
     private static void RestoreRandomNodes(IReadOnlyDictionary<long, (ListNode ListNode, NodeInfo Info)> nodes)
     {
         foreach (var node in nodes.Where(node => node.Value.Info.RandId.HasValue))
-        {
             node.Value.ListNode.Random = nodes[node.Value.Info.RandId.Value].ListNode;
-        }
     }
 
     public async Task Serialize(ListNode head, Stream stream)
     {
         var tempNodes = GetNodesInfo(head, true);
 
-        var serial = string.Join(',',
-            tempNodes
-                .Select(item => $"{item.Id}.{item.RandId}.{item.Data}"));
-
-        var bytes = Encoding.UTF8.GetBytes(serial);
-
-        await stream.WriteAsync(bytes);
+        foreach (var node in tempNodes)
+        {
+            stream.Write(BitConverter.GetBytes(node.Id));
+            stream.Write(BitConverter.GetBytes(node.RandId ?? -1));
+            stream.Write(BitConverter.GetBytes(node.Data.Length));
+            stream.Write(Encoding.UTF8.GetBytes(node.Data));
+        }
+        // var serial = string.Join(',',
+        //     tempNodes
+        //         .Select(item => $"{item.Id}.{item.RandId}.{item.Data}"));
+        //
+        // var bytes = Encoding.UTF8.GetBytes(serial);
+        //
+        // await stream.WriteAsync(bytes);
     }
 
     private IEnumerable<NodeInfo> GetNodesInfo(ListNode head, bool isShield)
     {
-        long id = 0;
-        long order = 0;
+        var id = 0;
+        var order = 0;
         var tempNodes = new Dictionary<ListNode, NodeInfo>();
 
         var currentNode = head;
