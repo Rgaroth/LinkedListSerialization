@@ -3,6 +3,7 @@ using ListNodeSerializer.Nodes;
 using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsTCPIP;
 using SerializerTests.Interfaces;
 using SerializerTests.Nodes;
+using System;
 
 namespace SerializerTests.Implementations;
 
@@ -10,17 +11,16 @@ public class RgarothSerializer : IListSerializer
 {
     public async Task Serialize(ListNode head, Stream stream)
     {
-        var tempNodes = GetNodesInfo(head, true);
+        var tempNodes = GetNodesInfo(head)
+            .OrderBy(x => x.Value.Order);
 
         foreach (var node in tempNodes)
         {
-            await stream.WriteAsync(BitConverter.GetBytes(node.Id));
-            await stream.WriteAsync(BitConverter.GetBytes(node.RandId ?? -1));
-            await stream.WriteAsync(BitConverter.GetBytes(node.Data.Length));
-            await stream.WriteAsync(Encoding.UTF8.GetBytes(node.Data));
+            await stream.WriteAsync(BitConverter.GetBytes(node.Value.Id));
+            await stream.WriteAsync(BitConverter.GetBytes(node.Value.RandId ?? -1));
+            await stream.WriteAsync(BitConverter.GetBytes(node.Key.Data.Length));
+            await stream.WriteAsync(Encoding.UTF8.GetBytes(node.Key.Data));
         }
-
-        //return Task.CompletedTask;
     }
 
     public async Task<ListNode> Deserialize(Stream stream)
@@ -39,13 +39,13 @@ public class RgarothSerializer : IListSerializer
         {
             var bytes = new byte[4];
 
-            var readBytesId = await stream.ReadAsync(bytes, 0, sizeof(int));
+            var readBytesId = await stream.ReadAsync(bytes.AsMemory(0, sizeof(int)));
             var nodeId = BitConverter.ToInt32(bytes);
             
-            var readBytesRandId = await stream.ReadAsync(bytes, 0, sizeof(int));
+            var readBytesRandId = await stream.ReadAsync(bytes.AsMemory(0, sizeof(int)));
             var nodeRandomId = BitConverter.ToInt32(bytes);
             
-            var readBytesDataSize = await stream.ReadAsync(bytes, 0, sizeof(int));
+            var readBytesDataSize = await stream.ReadAsync(bytes.AsMemory(0, sizeof(int)));
             var dataLength = BitConverter.ToInt32(bytes);
 
             if (readBytesId != 4 ||
@@ -59,7 +59,7 @@ public class RgarothSerializer : IListSerializer
             }
 
             var dataBytes = new byte[dataLength];
-            var dataRealRead = await stream.ReadAsync(dataBytes, 0, dataBytes.Length);
+            var dataRealRead = await stream.ReadAsync(dataBytes);
 
             var nodeData = Encoding.UTF8.GetString(dataBytes);
 
@@ -77,7 +77,7 @@ public class RgarothSerializer : IListSerializer
             var listNode = new ListNode
             {
                 Previous = prev,
-                Data = ReplaceSpecialSymbols(nodeData, false)
+                Data = nodeData
             };
 
             if (prev != null) prev.Next = listNode;
@@ -103,7 +103,8 @@ public class RgarothSerializer : IListSerializer
 
     public Task<ListNode> DeepCopy(ListNode head)
     {
-        var nodesInfo = GetNodesInfo(head, false);
+        var nodesInfo = GetNodesInfo(head)
+            .OrderBy(x => x.Value.Order);
 
         var newNodes = new Dictionary<long, (ListNode ListNode, NodeInfo Info)>();
         ListNode prevNewNode = null;
@@ -112,13 +113,13 @@ public class RgarothSerializer : IListSerializer
         {
             var newNode = new ListNode
             {
-                Data = nodeInfo.Data,
+                Data = nodeInfo.Key.Data,
                 Previous = prevNewNode
             };
 
             if (prevNewNode != null) prevNewNode.Next = newNode;
 
-            newNodes.Add(nodeInfo.Id, (newNode, nodeInfo));
+            newNodes.Add(nodeInfo.Value.Id, (newNode, nodeInfo.Value));
 
             prevNewNode = newNode;
         }
@@ -134,7 +135,7 @@ public class RgarothSerializer : IListSerializer
             node.Value.ListNode.Random = nodes[node.Value.Info.RandId.Value].ListNode;
     }
     
-    private IEnumerable<NodeInfo> GetNodesInfo(ListNode head, bool isShield)
+    private Dictionary<ListNode, NodeInfo> GetNodesInfo(ListNode head)
     {
         var id = 0;
         var order = 0;
@@ -159,10 +160,7 @@ public class RgarothSerializer : IListSerializer
             var node = new NodeInfo
             {
                 Id = id++,
-                Order = order++,
-                Data = isShield
-                    ? ReplaceSpecialSymbols(currentNode.Data, true)
-                    : currentNode.Data
+                Order = order++
             };
 
             tempNodes.Add(currentNode, node);
@@ -183,10 +181,7 @@ public class RgarothSerializer : IListSerializer
 
                 var randNode = new NodeInfo
                 {
-                    Id = id++,
-                    Data = isShield
-                        ? ReplaceSpecialSymbols(currentRand.Data, true)
-                        : currentRand.Data
+                    Id = id++
                 };
 
                 prevRand.RandId = randNode.Id;
@@ -199,19 +194,6 @@ public class RgarothSerializer : IListSerializer
             currentNode = currentNode.Next;
         }
 
-        return tempNodes
-            .Select(x => x.Value)
-            .OrderBy(x => x.Order);
-    }
-
-    private string ReplaceSpecialSymbols(string source, bool shield)
-    {
-        return shield
-            ? source
-                .Replace(".", "\\.")
-                .Replace(",", "\\,")
-            : source
-                .Replace("\\.", ".")
-                .Replace("\\,", ",");
+        return tempNodes;
     }
 }
